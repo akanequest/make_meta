@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>メタデータを作りましょう(・ω・)q</title>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" media="all" href="style.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=M+PLUS+Rounded+1c" />
+    <script src="lib/marked.min.js"></script>
+    <script src="lib/jszip.min.js"></script>
+
+    <script language="javascript" type="text/javascript">
+      const urlRegex = /^(?:[a-zA-Z0-9\-]+):\/\/(?:www\.)?[a-z0-9\-]+(?:\.[a-z]{2,})+(?:\/[\w\-\.\?\=\&\#\%\+\,]*)*$/i;
+      const intRegex = /^\d+$/i;
+      var meta_ = null;
+      var zip_ = null;
+      var fileName_ = null;
+
+      function makeMETA(){
+        document.getElementById('err01').innerHTML = "";
+        document.getElementById('err02').innerHTML = "";
+        document.getElementById('result').classList.add("hide");
+
+        let imgurl = document.getElementById('imgurl').value.trim();
+        let flg_baseurl = urlRegex.test(imgurl);
+        zip_ = null;
+
+        fileName_ = document.getElementById('csv').value.match(/([^/\\]+)\.[^/.]+$/)?.[1];
+        console.log(fileName_);
+        //console.log(meta_);
+        if (meta_ == null){
+          document.getElementById('err02').innerHTML = "スプレッドシートから出力したcsvファイルを選択してください。";
+        }else{
+          var first = meta_[0].toString();
+          if (first.indexOf("id,name,description,image") == 0){
+            var err2 = "";
+
+            for (var i=1; i<meta_.length; i++){
+              if (!intRegex.test(meta_[i][0])){
+                err2 += "["+i+"]個目の 'id' に数値以外が入力されています（"+meta_[i][0]+"）<br/>";
+              }
+            }
+
+            var ng =[];
+            for (var i=1; i<meta_.length; i++){
+              if (ng.indexOf(i) != -1) continue;
+              var errid = ""
+              for (var j=i+1; j<meta_.length; j++){
+                if (ng.indexOf(j) != -1) continue;
+                if (meta_[i][0] == meta_[j][0]){
+                  errid += "["+j+"]";
+                  ng.push(j);
+                }
+              }
+              if (errid.length > 0){
+                err2 += "["+i+"]"+errid+"個目の 'id' が重複しています（"+meta_[i][0]+"）<br/>";
+              }
+            }
+
+            for (var i=1; i<meta_.length; i++){
+              if (!urlRegex.test(meta_[i][3])){
+                if (meta_[i][3].indexOf(".") == -1){
+                  meta_[i][3] += ".png";
+                }
+                if (!flg_baseurl){
+                  document.getElementById('err01').innerHTML = "URLを記入してください。";
+                  err2 += "「画像フォルダのURL」が正しいか確認してください。<br/>";
+                  break;
+                }else if (!urlRegex.test(imgurl+meta_[i][3])){
+                  err2 += "["+i+"]個目の 'image' が正しいか確認してください（"+imgurl+meta_[i][3]+"）<br/>";
+                }else{
+                  meta_[i][3] = imgurl+meta_[i][3];
+                }
+              }
+            }
+
+            if (err2.length == 0){
+              zip_ = new JSZip();
+
+              var pt = "";
+              for (var i=1; i<meta_.length; i++){
+                var json = '{"name":'+JSON.stringify(meta_[i][1])+',"description":'+JSON.stringify(meta_[i][2])+',"image":"'+meta_[i][3]+'","attributes":[';
+                pt += '<table class="nft"><tr><th>ID</th><td>'+meta_[i][0]+'</td></tr>'+
+                      '<tr><th>Name</th><td>'+meta_[i][1]+'</td></tr><tr><th>Description</th><td>'+
+                      marked.parse(escape_html(meta_[i][2]))+'</td></tr><tr><th>Image</th><td><a href="'+
+                      meta_[i][3]+'" target="_blank">'+meta_[i][3]+'</a></td></tr><tr><th>Attribute</th><td>';
+                var attCount = 0;
+                for (var j=4; j<meta_[0].length; j++){
+                  if (meta_[i][j] != ""){
+                    if (0 < attCount++) json += ',';
+                    json += '{"trait_type":'+JSON.stringify(meta_[0][j])+',"value":'+JSON.stringify(meta_[i][j])+'}';
+                    pt += '<div class="attbox"><span>'+meta_[0][j]+'</span>'+meta_[i][j]+'</div>';
+                  }
+                }
+                json += "]}";
+                zip_.file(""+meta_[i][0],json);
+                //console.log(json);
+                pt += '</td></tr></table>';
+              }
+              document.getElementById('preview').innerHTML = pt;
+              document.getElementById('result').classList.remove("hide");
+            }else{
+              err2 += "csvファイルを選択し直してください。"
+              document.getElementById('err02').innerHTML = err2;
+              document.getElementById('csv').value = "";
+            }
+          }else{
+            document.getElementById('err02').innerHTML = "スプレッドシートから出力したcsvファイルを選択してください。";
+          }
+        }
+      }
+      function getMETA(){
+        if (zip_ != null){
+          zip_.generateAsync({type:"blob"}).then(function (blob) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName_+'.zip';
+            link.click();
+          }, function (err) {
+            console.log("Error: "+err)
+          });
+        }
+      }
+
+      function escape_html (string) {
+        if(typeof string !== 'string') {
+          return string;
+        }
+        return string.replace(/[&'`"<>]/g, function(match) {
+          return {
+            '&': '&amp;',
+            "'": '&#x27;',
+            '`': '&#x60;',
+            '"': '&quot;',
+            '<': '&lt;',
+            '>': '&gt;',
+          }[match]
+        });
+      }
+    </script>
+  </head>
+
+  <body>
+    <h1>メタデータを作りましょう(・ω・)q</h1>
+    <p class="alert">
+      このツールは、入力された内容や選択したファイルの整合性はあんまりチェックしません。<br/>
+      誤字脱字などの不備がないかご自身で確認をお願いします。<br/>
+    </p>
+    <div>
+      <p>
+        <h2>1. 画像フォルダのURL</h2>
+        画像は事前にアップロードしておいてください。<br/>
+        csvの「image」欄にURLが記入されている場合はそちらが優先されます。<br/>
+        <input type="text" id="imgurl"/><br/>
+        <p id="err01" class="err"></p>
+      </p>
+      <p>
+        <h2>2. csvファイルを選択</h2>
+        「image」欄の拡張子が省略されている場合は自動で「.png」と追加します。<br/>
+        <input type="file" id="csv" name="csv" accept="text/csv" />
+        <p id="err02" class="err"></p>
+        <script>
+          document.getElementById('imgurl').value = localStorage.getItem("imgurl");
+          document.getElementById('imgurl').addEventListener("input",function(e){
+            localStorage.setItem("imgurl",e.target.value);
+          })
+          
+          const parseCsv = csv => csv.replace(/\r/g, '').split('\n').reduce(([data, isInQuotes], line) => {
+            const [datum, newIsInQuotes] = ((isInQuotes ? '"' : '') + line).split(',').reduce(([datum, isInQuotes], text) => {
+              const match = isInQuotes || text.match(/^(\"?)((.*?)(\"*))$/)
+              if (isInQuotes){
+                datum[datum.length - 1] += ',' + text.replace(/\"+/g, m => '"'.repeat(m.length / 2));
+              }else{
+                datum.push(match[1] ? match[2].replace(/\"+/g, m => '"'.repeat(m.length / 2)) : match[2]);
+              }
+              return [datum, isInQuotes ? !(text.match(/\"*$/)[0].length % 2) : match[1] && !(match[4].length % 2)]
+            }, [[]])
+            if (isInQuotes) data[data.length - 1].push(data[data.length - 1].pop() + '  \n' + datum[0], ...datum.slice(1))
+            else data.push(datum)
+            return [data, newIsInQuotes]
+          }, [[]])[0]
+
+          document.getElementById('csv').addEventListener("change",function(e){
+            var reader = new FileReader();
+            reader.readAsText(e.target.files[0]);
+            reader.addEventListener('load',function() {
+              document.getElementById('err02').innerHTML = "";
+              meta_ = parseCsv(reader.result);
+              console.log(meta_);
+            })
+          })
+        </script>
+      </p>
+      <input class="button" type="submit" onclick="makeMETA();" value="メタデータを作る" />
+    </div>
+    <div id="result" class="hide">
+      <h2>Preview</h2>
+      <div id="preview">
+      </div>
+      <input class="button" type="submit" onclick="getMETA();" value="メタデータをダウンロード" />
+    </div>
+  </body>
+</html>
