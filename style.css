@@ -17,6 +17,13 @@ div{
 input{
     width: 300px;
     margin-top: 0.5em;
+    border-color: #b7b7b7;
+    background: #e6e6e6;
+}
+input::file-selector-button{
+    border-color: #b7b7b7;
+    background: #e6e6e6;
+    padding: 1em 2em;
 }
 .button{
     margin-top: 2em;
